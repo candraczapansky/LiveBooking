@@ -711,6 +711,23 @@ export function registerAppointmentRoutes(app: Express, storage: IStorage) {
     
     try {
       const client = await storage.getUser(newAppointment.clientId);
+      
+      // Debug logging for SMS issue
+      console.log("📱 [SMS DEBUG] Fetched client for SMS confirmation:", {
+        appointmentId: newAppointment.id,
+        clientId: newAppointment.clientId,
+        clientFound: !!client,
+        clientPhone: client?.phone,
+        smsAppointmentReminders: client?.smsAppointmentReminders,
+        emailAppointmentReminders: client?.emailAppointmentReminders,
+        clientData: client ? {
+          id: client.id,
+          email: client.email,
+          phone: client.phone,
+          smsPrefs: client.smsAppointmentReminders
+        } : null
+      });
+      
       const staffRecord = await storage.getStaff(newAppointment.staffId);
       const staff = staffRecord ? await storage.getUser(staffRecord.userId) : null;
       const service = await storage.getService(newAppointment.serviceId);
@@ -908,12 +925,21 @@ export function registerAppointmentRoutes(app: Express, storage: IStorage) {
       }
 
       // Send SMS confirmation (single block to prevent duplicates)
+      console.log("📱 [SMS CHECK] About to check if SMS should be sent:", {
+        hasClient: !!client,
+        clientPhone: client?.phone,
+        smsAppointmentReminders: client?.smsAppointmentReminders,
+        willSendSms: !!(client && client.smsAppointmentReminders && client.phone)
+      });
+      
       if (client && client.smsAppointmentReminders && client.phone) {
+        console.log("✅ [SMS] All conditions met, attempting to send SMS confirmation");
         LoggerService.info("Sending SMS confirmation", {
           ...context,
           appointmentId: newAppointment.id,
           to: client.phone,
-          smsAppointmentReminders: client.smsAppointmentReminders
+          smsAppointmentReminders: client.smsAppointmentReminders,
+          bookingMethod: (enrichedAppointmentData as any).bookingMethod || 'unknown'
         });
         
         try {
@@ -972,7 +998,12 @@ export function registerAppointmentRoutes(app: Express, storage: IStorage) {
           appointmentId: newAppointment.id,
           smsAppointmentReminders: client?.smsAppointmentReminders,
           hasPhone: !!client?.phone,
-          phone: client?.phone
+          phone: client?.phone,
+          hasClient: !!client,
+          bookingMethod: (enrichedAppointmentData as any).bookingMethod || 'unknown',
+          skipReason: !client ? "No client found" : 
+                      !client.smsAppointmentReminders ? "SMS reminders disabled" : 
+                      !client.phone ? "No phone number" : "Unknown reason"
         });
       }
     } catch (error) {
@@ -1069,15 +1100,22 @@ export function registerAppointmentRoutes(app: Express, storage: IStorage) {
 
         // Validate appointment time conflicts (staff and rooms)
         const conflictingAppointments = allAppointments.filter((apt: any) => {
-          if (apt.status === 'cancelled' || apt.status === 'completed') return false;
-          if (apt.staffId !== staffId) return false;
+          const isSameStaff = apt.staffId === appointmentData.staffId;
+          const isSameLocation = appointmentData.locationId === null || apt.locationId === appointmentData.locationId;
+          const isActive = apt.status !== 'cancelled' && apt.status !== 'completed';
           
           const existingStart = new Date(apt.startTime);
           const existingEnd = new Date(apt.endTime);
           const newStart = new Date(appointmentData.startTime);
           const newEnd = new Date(appointmentData.endTime);
+          const hasTimeOverlap = existingStart < newEnd && existingEnd > newStart;
           
-          return existingStart < newEnd && existingEnd > newStart;
+          // Room conflict check
+          const existingRoomId = serviceIdToRoomId.get(apt.serviceId) ?? null;
+          const isSameRoom = appointmentRoomId != null && existingRoomId != null && existingRoomId === appointmentRoomId;
+          
+          // Conflict if same staff at same location OR same room, with overlapping times
+          return isActive && hasTimeOverlap && ((isSameStaff && isSameLocation) || isSameRoom);
         });
 
         if (conflictingAppointments.length > 0) {
@@ -1085,7 +1123,8 @@ export function registerAppointmentRoutes(app: Express, storage: IStorage) {
             ...context,
             appointmentIndex: i,
             startTime: appointmentData.startTime,
-            endTime: appointmentData.endTime
+            endTime: appointmentData.endTime,
+            conflictingAppointmentIds: conflictingAppointments.map((apt: any) => apt.id)
           });
           
           failedAppointments.push({
@@ -1093,6 +1132,60 @@ export function registerAppointmentRoutes(app: Express, storage: IStorage) {
             date: appointmentDate.startTime,
             reason: "Time conflict with existing appointment"
           });
+          continue;
+        }
+
+        // Check for blocked schedules
+        const apptDate = new Date(appointmentData.startTime);
+        const dayName = apptDate.toLocaleDateString('en-US', { weekday: 'long' });
+        const dateString = apptDate.toISOString().slice(0, 10);
+        
+        const staffSchedules = await storage.getStaffSchedulesByStaffId(appointmentData.staffId);
+        const blockedSchedules = staffSchedules.filter((schedule: any) => 
+          schedule.dayOfWeek === dayName &&
+          schedule.startDate <= dateString &&
+          (!schedule.endDate || schedule.endDate >= dateString) &&
+          schedule.isBlocked
+        );
+        
+        // Check if the appointment time falls within any blocked schedule
+        const appointmentStart = new Date(appointmentData.startTime);
+        const appointmentEnd = new Date(appointmentData.endTime);
+        
+        let hasBlockConflict = false;
+        for (const blockedSchedule of blockedSchedules) {
+          const [blockStartHour, blockStartMinute] = blockedSchedule.startTime.split(':').map(Number);
+          const [blockEndHour, blockEndMinute] = blockedSchedule.endTime.split(':').map(Number);
+          
+          const blockStart = new Date(apptDate);
+          blockStart.setHours(blockStartHour, blockStartMinute, 0, 0);
+          
+          const blockEnd = new Date(apptDate);
+          blockEnd.setHours(blockEndHour, blockEndMinute, 0, 0);
+          
+          // Check if the new appointment overlaps with the blocked time
+          if (appointmentStart < blockEnd && appointmentEnd > blockStart) {
+            hasBlockConflict = true;
+            LoggerService.warn("Recurring appointment conflicts with blocked schedule", {
+              ...context,
+              appointmentIndex: i,
+              blockedSchedule: {
+                startTime: blockedSchedule.startTime,
+                endTime: blockedSchedule.endTime,
+                dayOfWeek: blockedSchedule.dayOfWeek
+              }
+            });
+            
+            failedAppointments.push({
+              index: i,
+              date: appointmentDate.startTime,
+              reason: `Staff unavailable (blocked schedule from ${blockedSchedule.startTime} to ${blockedSchedule.endTime})`
+            });
+            break;
+          }
+        }
+        
+        if (hasBlockConflict) {
           continue;
         }
 
@@ -2321,6 +2414,12 @@ export function registerAppointmentRoutes(app: Express, storage: IStorage) {
     const updateData = req.body;
     const context = getLogContext(req);
     
+    console.log("🔄 RECURRING UPDATE REQUEST:", {
+      groupId,
+      updateData,
+      body: req.body
+    });
+    
     LoggerService.info("Updating all future recurring appointments", { ...context, groupId, updateData });
     
     // Get all appointments with this recurringGroupId
@@ -2333,12 +2432,18 @@ export function registerAppointmentRoutes(app: Express, storage: IStorage) {
       apt.status !== 'completed'
     );
     
+    console.log("🔄 FOUND FUTURE APPOINTMENTS TO UPDATE:", {
+      count: futureAppointments.length,
+      appointmentIds: futureAppointments.map((a: any) => a.id)
+    });
+    
     const updatedAppointments = [];
     const failedUpdates = [];
     
     // Update each future appointment
     for (const appointment of futureAppointments) {
       try {
+        console.log(`🔄 Updating appointment ${appointment.id} with:`, updateData);
         await storage.updateAppointment(appointment.id, updateData);
         updatedAppointments.push(appointment.id);
         LoggerService.info("Updated recurring appointment", { 
@@ -2346,6 +2451,7 @@ export function registerAppointmentRoutes(app: Express, storage: IStorage) {
           appointmentId: appointment.id 
         });
       } catch (error) {
+        console.error(`❌ Failed to update appointment ${appointment.id}:`, error);
         LoggerService.error("Failed to update recurring appointment", { 
           ...context, 
           appointmentId: appointment.id,

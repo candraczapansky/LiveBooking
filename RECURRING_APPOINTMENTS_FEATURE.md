@@ -79,3 +79,5 @@ When viewing an appointment that is part of a recurring series:
 3. Edit all future appointments - verify only future ones are updated
 4. Cancel all future appointments - verify only future ones are cancelled
 5. Individual appointment edits should still work normally
+
+

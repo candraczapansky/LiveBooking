@@ -17,6 +17,8 @@ import { format } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { useDocumentTitle } from "@/hooks/use-document-title";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import ConversationFlowEditor from "@/components/settings/ConversationFlowEditor";
 
 interface PhoneCallData {
   id: number;
@@ -243,7 +245,7 @@ export default function PhonePage() {
           <div className="w-full max-w-none sm:max-w-7xl mx-auto px-0 sm:px-4">
             <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Phone System</h1>
           <p className="text-muted-foreground">Manage calls, recordings, and phone communications</p>
@@ -336,8 +338,16 @@ export default function PhonePage() {
         </Dialog>
       </div>
 
-      {/* Analytics Cards */}
-      {analytics && (
+      {/* Tabs for Call History and Conversation Flows */}
+      <Tabs defaultValue="calls" className="space-y-4">
+        <TabsList className="grid w-full grid-cols-2 max-w-md">
+          <TabsTrigger value="calls">Call History</TabsTrigger>
+          <TabsTrigger value="flows">AI Voice Responder</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="calls" className="space-y-4">
+          {/* Analytics Cards */}
+          {analytics && (
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -527,6 +537,12 @@ export default function PhonePage() {
           )}
         </CardContent>
       </Card>
+        </TabsContent>
+
+        <TabsContent value="flows" className="space-y-4">
+          <ConversationFlowEditor />
+        </TabsContent>
+      </Tabs>
             </div>
           </div>
         </main>

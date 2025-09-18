@@ -1313,7 +1313,8 @@ const BookingWidget = ({ open, onOpenChange, userId, overlayColor, variant = 'de
           addOnServiceIds: selectedAddOnIds.map(id => parseInt(id)),
           recurringAppointments: appointmentDates,
           recurringFrequency: values.recurringFrequency,
-          recurringCount: values.recurringCount
+          recurringCount: values.recurringCount,
+          bookingMethod: 'widget'  // Track appointments from booking widget
         };
         
         console.log("[BookingWidget] Creating recurring appointments with data:", recurringData);
@@ -1335,7 +1336,8 @@ const BookingWidget = ({ open, onOpenChange, userId, overlayColor, variant = 'de
           notes: values.notes,
           locationId: parseInt(values.locationId),
           totalAmount: totalAmount,
-          addOnServiceIds: selectedAddOnIds.map(id => parseInt(id))
+          addOnServiceIds: selectedAddOnIds.map(id => parseInt(id)),
+          bookingMethod: 'widget'  // Track appointments from booking widget
         };
         
         console.log("[BookingWidget] Creating appointment with data:", appointmentData);
@@ -1459,15 +1461,24 @@ const BookingWidget = ({ open, onOpenChange, userId, overlayColor, variant = 'de
                 setClientAppointmentHistory([]);
               }
             } else {
-              // Create new client
-              const newClientRes = await apiRequest("POST", "/api/clients", {
+              // Create new client with SMS preferences enabled
+              const clientData = {
                 firstName: latestValues.firstName,
                 lastName: latestValues.lastName,
                 email: latestValues.email,
                 phone: latestValues.phone,
-                role: 'client'
-              });
+                role: 'client',
+                // Explicitly set SMS preferences
+                smsAppointmentReminders: true,
+                emailAppointmentReminders: true
+              };
+              
+              console.log("📱 [BOOKING WIDGET] Creating new client with data:", clientData);
+              
+              const newClientRes = await apiRequest("POST", "/api/clients", clientData);
               const newClient = await newClientRes.json();
+              
+              console.log("📱 [BOOKING WIDGET] Created client response:", newClient);
               clientId = newClient.id;
               setExistingClient(null);
               setClientAppointmentHistory([]);

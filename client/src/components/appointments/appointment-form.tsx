@@ -176,7 +176,7 @@ const AppointmentForm = ({ open, onOpenChange, appointmentId, selectedDate, sele
   const [showScheduleEdit, setShowScheduleEdit] = useState(false);
   
   // Check if we're editing recurring appointments
-  const editRecurringMode = queryClient.getQueryData(['editRecurringMode']) as boolean;
+  const editRecurringMode = queryClient.getQueryData(['editRecurringMode']) as 'single' | 'all' | false;
   const recurringGroupId = queryClient.getQueryData(['recurringGroupId']) as string;
   
   // Clear recurring edit mode when dialog closes
@@ -858,7 +858,62 @@ const AppointmentForm = ({ open, onOpenChange, appointmentId, selectedDate, sele
       // Normal flow for all other appointments
       return apiRequest("POST", "/api/appointments", appointmentData);
     },
-    onSuccess: (data: any) => {
+    onSuccess: async (response: any) => {
+      // Check if this is a response object (recurring) or direct data (single)
+      let data = response;
+      let isRecurringResponse = false;
+      
+      // If response has json method, it's a fetch response from recurring endpoint
+      if (response && typeof response.json === 'function') {
+        try {
+          data = await response.json();
+          isRecurringResponse = true;
+        } catch (e) {
+          console.error("Failed to parse response:", e);
+        }
+      }
+      
+      // Handle recurring appointment response
+      if (isRecurringResponse && data) {
+        const { createdCount = 0, failedCount = 0, failures = [] } = data;
+        
+        // Force refresh of appointments data
+        queryClient.invalidateQueries({ queryKey: ['/api/appointments'] });
+        queryClient.invalidateQueries({ queryKey: ['/api/appointments/active'] });
+        if (selectedLocation?.id) {
+          queryClient.invalidateQueries({ queryKey: ['/api/appointments', selectedLocation.id] });
+        }
+        queryClient.refetchQueries({ queryKey: ['/api/appointments'] });
+        
+        onOpenChange(false);
+        
+        // Show appropriate success/warning message
+        if (failedCount > 0) {
+          const failureDetails = failures.map((f: any) => {
+            const date = new Date(f.date).toLocaleDateString();
+            return `${date}: ${f.reason}`;
+          }).join('\n');
+          
+          toast({
+            title: "⚠️ Partial Success",
+            description: `Created ${createdCount} appointments. ${failedCount} appointments could not be created due to conflicts:\n${failureDetails}`,
+            variant: "default",
+            duration: 10000,
+          });
+        } else {
+          toast({
+            title: "Success",
+            description: `${createdCount} recurring appointments created successfully.`,
+          });
+        }
+        
+        // Call callback
+        if (onAppointmentCreated && data.createdAppointments && data.createdAppointments.length > 0) {
+          onAppointmentCreated(data.createdAppointments[0]);
+        }
+        return;
+      }
+      
       // Special handling for October 26th appointments or our fallback ID
       const isOctober26 = data.id === 999999 || 
                           (data.startTime && new Date(data.startTime).toISOString().slice(0, 10) === '2025-10-26');
@@ -1022,17 +1077,54 @@ const AppointmentForm = ({ open, onOpenChange, appointmentId, selectedDate, sele
         throw new Error("No appointment ID provided");
       }
 
-      // If we're editing all recurring appointments
+      // If we're editing recurring appointments
       if (editRecurringMode && recurringGroupId) {
-        const updateData = {
-          staffId: parseInt(values.staffId),
-          serviceId: parseInt(values.serviceId),
-          clientId: parseInt(values.clientId),
-          notes: values.notes || null,
-          addOnServiceIds: values.addOnServiceId ? [parseInt(values.addOnServiceId)] : [],
-        };
+        // For single appointment edit within recurring series
+        if (editRecurringMode === 'single') {
+          // Validate time for single appointment edit
+          if (!values.time || values.time.trim() === '') {
+            throw new Error('Please select a time for the appointment');
+          }
+          
+          const [hours, minutes] = values.time.split(':').map(Number);
+          const year = values.date.getFullYear();
+          const month = values.date.getMonth();
+          const day = values.date.getDate();
+          const localDate = new Date(year, month, day, hours, minutes, 0, 0);
+          
+          const selectedServiceData = services?.find((s: any) => s.id.toString() === values.serviceId);
+          const totalDuration = (selectedServiceData?.duration || 60) + 
+                               (selectedServiceData?.bufferTimeBefore || 0) + 
+                               (selectedServiceData?.bufferTimeAfter || 0);
+          const endTime = addMinutes(localDate, totalDuration);
+          
+          const updateData = {
+            staffId: parseInt(values.staffId),
+            serviceId: parseInt(values.serviceId),
+            clientId: parseInt(values.clientId),
+            locationId: selectedLocation?.id || null,
+            startTime: localDate.toISOString(),
+            endTime: endTime.toISOString(),
+            notes: values.notes || null,
+            addOnServiceIds: values.addOnServiceId ? [parseInt(values.addOnServiceId)] : [],
+          };
+          
+          // Call the single appointment update endpoint (breaks from series)
+          return apiRequest("PUT", `/api/appointments/recurring/${recurringGroupId}/single/${appointmentId}`, updateData);
+        }
         
-        return apiRequest("PUT", `/api/appointments/recurring/${recurringGroupId}/all`, updateData);
+        // For editing all future appointments in series
+        if (editRecurringMode === 'all') {
+          const updateData = {
+            staffId: parseInt(values.staffId),
+            serviceId: parseInt(values.serviceId),
+            clientId: parseInt(values.clientId),
+            notes: values.notes || null,
+            addOnServiceIds: values.addOnServiceId ? [parseInt(values.addOnServiceId)] : [],
+          };
+          
+          return apiRequest("PUT", `/api/appointments/recurring/${recurringGroupId}/all`, updateData);
+        }
       }
 
       // Regular single appointment update
@@ -1107,14 +1199,45 @@ const AppointmentForm = ({ open, onOpenChange, appointmentId, selectedDate, sele
       
       onOpenChange(false);
       
+      // Clear recurring edit mode
+      if (editRecurringMode) {
+        queryClient.setQueryData(['editRecurringMode'], false);
+        queryClient.setQueryData(['recurringGroupId'], null);
+      }
+      
       // Show appropriate success message
-      if (editRecurringMode && response?.json) {
-        response.json().then((data: any) => {
+      if (editRecurringMode === 'single') {
+        // For single appointment edit (removed from series)
+        toast({
+          title: "Success",
+          description: "Appointment updated and removed from recurring series.",
+        });
+        // Force refresh to show the appointment is no longer part of the series
+        queryClient.invalidateQueries({ queryKey: ['/api/appointments', appointmentId] });
+        queryClient.invalidateQueries({ queryKey: ['/api/appointments/recurring', recurringGroupId] });
+        queryClient.refetchQueries({ queryKey: ['/api/appointments'] });
+      } else if (editRecurringMode === 'all') {
+        // For recurring updates, parse the response
+        if (response && typeof response.json === 'function') {
+          response.json().then((data: any) => {
+            console.log("🔄 Recurring update response:", data);
+            toast({
+              title: "Success",
+              description: `Updated ${data.updatedCount || 0} future appointments in the series.`,
+            });
+            
+            // Force refresh the appointment details and list
+            queryClient.invalidateQueries({ queryKey: ['/api/appointments', appointmentId] });
+            queryClient.invalidateQueries({ queryKey: ['/api/appointments/recurring', recurringGroupId] });
+            queryClient.refetchQueries({ queryKey: ['/api/appointments', appointmentId] });
+            queryClient.refetchQueries({ queryKey: ['/api/appointments'] });
+          });
+        } else {
           toast({
             title: "Success",
-            description: `Updated ${data.updatedCount || 0} future appointments in the series.`,
+            description: "Recurring appointments updated successfully.",
           });
-        });
+        }
       } else {
         toast({
           title: "Success",
@@ -1248,24 +1371,28 @@ const AppointmentForm = ({ open, onOpenChange, appointmentId, selectedDate, sele
           <DialogHeader>
             <div className="flex items-start justify-between">
               <div className="flex-1">
-                <DialogTitle>
-                  {preSelectedStaffId && selectedSchedule 
-                    ? "Appointment & Schedule Management" 
-                    : editRecurringMode
-                      ? "Edit Recurring Appointments"
-                    : appointmentId && appointmentId > 0 
-                      ? "Edit Appointment" 
-                      : "Create Appointment"}
-                </DialogTitle>
-                <DialogDescription className="mt-1">
-                  {preSelectedStaffId && selectedSchedule
-                    ? "Create an appointment or adjust the schedule for this time slot."
-                    : editRecurringMode
-                      ? "Changes will apply to all future appointments in this recurring series."
-                    : appointmentId && appointmentId > 0 
-                      ? "Update the appointment details below." 
-                      : "Fill in the details to create a new appointment."}
-                </DialogDescription>
+          <DialogTitle>
+            {preSelectedStaffId && selectedSchedule 
+              ? "Appointment & Schedule Management" 
+              : editRecurringMode === 'all'
+                ? "Edit All Future Recurring Appointments"
+              : editRecurringMode === 'single'
+                ? "Edit Single Appointment"
+              : appointmentId && appointmentId > 0 
+                ? "Edit Appointment" 
+                : "Create Appointment"}
+          </DialogTitle>
+          <DialogDescription className="mt-1">
+            {preSelectedStaffId && selectedSchedule
+              ? "Create an appointment or adjust the schedule for this time slot."
+              : editRecurringMode === 'all'
+                ? "Changes will apply to all future appointments in this recurring series."
+              : editRecurringMode === 'single'
+                ? "This appointment will be removed from the recurring series and updated independently."
+              : appointmentId && appointmentId > 0 
+                ? "Update the appointment details below." 
+                : "Fill in the details to create a new appointment."}
+          </DialogDescription>
               </div>
               {preSelectedStaffId && selectedSchedule && (
                 <Button

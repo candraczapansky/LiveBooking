@@ -1068,6 +1068,8 @@ const AppointmentsPage = () => {
   const handleEditAppointment = (appointmentId: number) => {
     setSelectedAppointmentId(appointmentId);
     setIsFormOpen(true);
+    // Keep details dialog open when editing
+    // setIsDetailsOpen remains true
   };
 
   const handleDeleteAppointment = () => {
@@ -2376,11 +2378,22 @@ const AppointmentsPage = () => {
       <Suspense fallback={null}>
         <AppointmentForm
           open={isFormOpen}
-          onOpenChange={setIsFormOpen}
+          onOpenChange={(open) => {
+            setIsFormOpen(open);
+            if (!open) {
+              // When form closes, clear the selected appointment
+              setSelectedAppointmentId(null);
+              // Note: Keep details dialog open if it was open
+            }
+          }}
           appointmentId={selectedAppointmentId}
           onAppointmentCreated={(appointment) => {
             console.log("[APPOINTMENTS PAGE] onAppointmentCreated called with:", appointment);
             refetch();
+            // If editing from details, keep details open
+            if (isDetailsOpen) {
+              setIsFormOpen(false);
+            }
           }}
           appointments={appointments}
           selectedDate={editAvailabilityDate || selectedDate}

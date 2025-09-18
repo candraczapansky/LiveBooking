@@ -1378,37 +1378,78 @@ const AppointmentDetails = ({
                     Manage Recurring Series
                   </Button>
                   
-                  {showRecurringOptions && (
-                    <div className="mt-4 p-4 border rounded-lg space-y-3 bg-gray-50 dark:bg-gray-800">
-                      <h4 className="font-medium text-sm mb-2">Recurring Series Options</h4>
-                      
-                      <PermissionGuard permission="update_appointments">
-                        <Button
-                          variant="outline"
-                          className="w-full justify-start"
-                          onClick={() => {
-                            if (confirm("Edit all future appointments in this series? This will update service, staff, and notes for all future appointments.")) {
-                              if (onEdit && appointmentId) {
-                                onEdit(appointmentId);
-                                // Pass a flag to indicate editing all recurring appointments
-                                queryClient.setQueryData(['editRecurringMode'], true);
-                                queryClient.setQueryData(['recurringGroupId'], appointment.recurringGroupId);
-                              }
-                              onOpenChange(false);
-                            }
-                          }}
-                        >
-                          <Edit className="mr-2 h-4 w-4" />
-                          Edit All Future Appointments
-                        </Button>
-                      </PermissionGuard>
+                {showRecurringOptions && (
+                  <div className="mt-4 p-4 border rounded-lg space-y-3 bg-gray-50 dark:bg-gray-800">
+                    <h4 className="font-medium text-sm mb-2">Recurring Series Options</h4>
+                    
+                    <PermissionGuard permission="update_appointments">
+                      <Button
+                        variant="outline"
+                        className="w-full justify-start"
+                        onClick={() => {
+                          // Set single edit mode for this specific appointment
+                          queryClient.setQueryData(['editRecurringMode'], 'single');
+                          queryClient.setQueryData(['recurringGroupId'], appointment.recurringGroupId);
+                          
+                          // Show a toast notification
+                          toast({
+                            title: "Editing Single Appointment",
+                            description: "You're editing only this appointment. It will be removed from the recurring series.",
+                          });
+                          
+                          // Open the edit form
+                          if (onEdit && appointmentId) {
+                            onEdit(appointmentId);
+                          }
+                        }}
+                      >
+                        <Edit className="mr-2 h-4 w-4" />
+                        Edit This Appointment Only
+                      </Button>
+                    </PermissionGuard>
+                    
+                    <PermissionGuard permission="update_appointments">
+                      <Button
+                        variant="outline"
+                        className="w-full justify-start"
+                        onClick={() => {
+                          // Set the recurring edit mode first
+                          queryClient.setQueryData(['editRecurringMode'], 'all');
+                          queryClient.setQueryData(['recurringGroupId'], appointment.recurringGroupId);
+                          
+                          // Show a toast notification instead of confirm dialog
+                          toast({
+                            title: "Editing Recurring Series",
+                            description: "You're now editing all future appointments in this series. Changes will apply to all future appointments.",
+                          });
+                          
+                          // Open the edit form
+                          if (onEdit && appointmentId) {
+                            onEdit(appointmentId);
+                          }
+                        }}
+                      >
+                        <Calendar className="mr-2 h-4 w-4" />
+                        Edit All Future Appointments
+                      </Button>
+                    </PermissionGuard>
                       
                       <PermissionGuard permission="delete_appointments">
                         <Button
                           variant="outline"
                           className="w-full justify-start text-red-600 hover:text-red-700 hover:bg-red-50"
-                          onClick={async () => {
-                            if (confirm("Cancel all future appointments in this recurring series? This action cannot be undone.")) {
+                          onClick={async (event) => {
+                            // Show warning toast
+                            toast({
+                              title: "⚠️ Are you sure?",
+                              description: "Click again within 5 seconds to confirm cancellation of all future appointments.",
+                              variant: "destructive",
+                            });
+                            
+                            // Set up double-click protection
+                            const button = event.currentTarget as HTMLButtonElement;
+                            if (button?.dataset.confirmCancel === "true") {
+                              // Second click - proceed with cancellation
                               try {
                                 const res = await apiRequest(
                                   "PUT", 
@@ -1421,7 +1462,9 @@ const AppointmentDetails = ({
                                     description: `${result.cancelledCount} future appointments have been cancelled.`
                                   });
                                   queryClient.invalidateQueries({ queryKey: ['/api/appointments'] });
-                                  onOpenChange(false);
+                                  queryClient.invalidateQueries({ queryKey: ['/api/appointments/recurring', appointment.recurringGroupId] });
+                                  // Refresh recurring appointments data
+                                  setShowRecurringOptions(false);
                                 } else {
                                   throw new Error('Failed to cancel recurring appointments');
                                 }
@@ -1432,6 +1475,13 @@ const AppointmentDetails = ({
                                   variant: "destructive"
                                 });
                               }
+                              button.dataset.confirmCancel = "false";
+                            } else {
+                              // First click - enable confirmation
+                              button.dataset.confirmCancel = "true";
+                              setTimeout(() => {
+                                button.dataset.confirmCancel = "false";
+                              }, 5000);
                             }
                           }}
                         >
@@ -2083,7 +2133,16 @@ const AppointmentDetails = ({
               </div>
               <div>
                 {appointment.notes ? (
-                  <p className="text-sm text-gray-600 dark:text-gray-400">{appointment.notes}</p>
+                  <>
+                    <p className="text-sm text-gray-600 dark:text-gray-400">{appointment.notes}</p>
+                    {appointment.notes.includes("(Modified from recurring series)") && (
+                      <div className="mt-2 p-2 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded">
+                        <p className="text-xs text-blue-700 dark:text-blue-300">
+                          ℹ️ This appointment was previously part of a recurring series but has been individually modified.
+                        </p>
+                      </div>
+                    )}
+                  </>
                 ) : (
                   <p className="text-sm text-gray-500 italic">No notes added yet</p>
                 )}
@@ -2161,8 +2220,11 @@ const AppointmentDetails = ({
             {onEdit && (
               <Button
                 onClick={() => {
-                  onOpenChange(false);
+                  // Clear any recurring edit mode for regular edit
+                  queryClient.setQueryData(['editRecurringMode'], false);
+                  queryClient.setQueryData(['recurringGroupId'], null);
                   onEdit(appointmentId!);
+                  // Don't close the dialog - let the edit form open on top
                 }}
                 className="flex items-center justify-center gap-1 order-2 sm:order-none"
               >

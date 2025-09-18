@@ -2296,27 +2296,70 @@ export async function registerRoutes(app: Express, storage: IStorage, autoRenewa
     if (!DialCallStatus || (DialCallStatus !== 'completed' && DialCallStatus !== 'answered')) {
       console.log(`📞 Call not completed (status: ${DialCallStatus || 'immediate-failure'}), forwarding to AI...`);
       
-      // Use built-in AI responder (Python service not accessible in deployed environment)
-      console.log('📞 Using built-in AI responder for unanswered call');
+      // Use conversation flow system for AI responder
+      console.log('📞 Using conversation flow AI responder for unanswered call');
       
-      // Generate AI response directly
-      const twiml = `<?xml version="1.0" encoding="UTF-8"?>
-        <Response>
-          <Say voice="alice">
-            Hello! Thank you for calling Glo Head Spa. I'm your AI assistant and I'm here to help you today.
-          </Say>
-          <Gather input="speech" timeout="10" speechTimeout="3" 
-                  action="https://dev-booking-91625-candraczapansky.replit.app/api/webhook/voice/process" 
-                  method="POST">
+        try {
+          // Get the root greeting node from conversation flows
+          const rootNode = await VoiceConversationFlowService.getRootNode();
+          
+          if (!rootNode) {
+            // Use default greeting if no flows configured
+            const defaultNode = { message: "Hello! Thank you for calling Glo Head Spa. How can I help you today?", timeout: 10, speechTimeout: 3 };
+            console.log('⚠️ No root node found, using default greeting');
+            const twiml = `<?xml version="1.0" encoding="UTF-8"?>
+              <Response>
+                <Say voice="alice">${defaultNode.message}</Say>
+                <Gather input="speech" timeout="${defaultNode.timeout}" speechTimeout="${defaultNode.speechTimeout}"
+                        action="https://dev-booking-91625-candraczapansky.replit.app/api/webhook/voice/process"
+                        method="POST">
+                  <Say voice="alice">Are you calling to book an appointment or do you have questions about our services?</Say>
+                </Gather>
+                <Redirect>https://dev-booking-91625-candraczapansky.replit.app/api/webhook/voice/process</Redirect>
+              </Response>`;
+            res.set('Content-Type', 'text/xml');
+            return res.send(twiml);
+          }
+          
+          // Create a new session for this call
+          await VoiceConversationFlowService.getOrCreateSession(CallSid, From);
+        
+        // Generate AI response with greeting from flow
+        const twiml = `<?xml version="1.0" encoding="UTF-8"?>
+          <Response>
+            <Say voice="alice">${rootNode.message}</Say>
+            <Gather input="speech" timeout="${rootNode.timeout || 10}" speechTimeout="${rootNode.speechTimeout || 3}" 
+                    action="https://dev-booking-91625-candraczapansky.replit.app/api/webhook/voice/process" 
+                    method="POST">
+              <Say voice="alice">Please tell me how I can help you.</Say>
+            </Gather>
+            <Redirect>https://dev-booking-91625-candraczapansky.replit.app/api/webhook/voice/process</Redirect>
+          </Response>`;
+        
+        res.set('Content-Type', 'text/xml');
+        return res.send(twiml);
+      } catch (error) {
+        console.error('❌ Error getting conversation flow:', error);
+        
+        // Fallback to default greeting
+        const twiml = `<?xml version="1.0" encoding="UTF-8"?>
+          <Response>
             <Say voice="alice">
-              Are you calling to book an appointment for one of our amazing head spa treatments, or do you have questions about our services?
+              Hello! Thank you for calling. How can I help you today?
             </Say>
-          </Gather>
-          <Redirect>https://dev-booking-91625-candraczapansky.replit.app/api/webhook/voice/process</Redirect>
-        </Response>`;
-      
-      res.set('Content-Type', 'text/xml');
-      return res.send(twiml);
+            <Gather input="speech" timeout="10" speechTimeout="3" 
+                    action="https://dev-booking-91625-candraczapansky.replit.app/api/webhook/voice/process" 
+                    method="POST">
+              <Say voice="alice">
+                Are you calling to book an appointment or do you have questions about our services?
+              </Say>
+            </Gather>
+            <Redirect>https://dev-booking-91625-candraczapansky.replit.app/api/webhook/voice/process</Redirect>
+          </Response>`;
+        
+        res.set('Content-Type', 'text/xml');
+        return res.send(twiml);
+      }
     } else {
       // Call was answered or completed
       res.set('Content-Type', 'text/xml');
@@ -2324,69 +2367,77 @@ export async function registerRoutes(app: Express, storage: IStorage, autoRenewa
     }
   });
 
+  // Import the voice conversation flow service
+  const { VoiceConversationFlowService } = await import('./services/voice-conversation-flow-service.js');
+  
+  // Initialize voice conversation flows on startup
+  await VoiceConversationFlowService.ensureSchema();
+  await VoiceConversationFlowService.initializeDefaultFlows();
+  
+  // Register voice conversation flow management routes
+  const voiceConversationFlowRoutes = await import('./routes/voice-conversation-flows.js');
+  app.use('/api/voice-conversation-flows', voiceConversationFlowRoutes.default);
+  
   // Voice processing webhook (for speech/DTMF input if needed)
   app.post('/api/webhook/voice/process', async (req: Request, res: Response) => {
     console.log('📞 Voice processing:', req.body);
-    const { SpeechResult } = req.body;
+    const { SpeechResult, CallSid, From } = req.body;
     
-    let responseText = "Thank you for calling Glo Head Spa!";
-    
-    if (SpeechResult) {
-      const speech = SpeechResult.toLowerCase();
-      console.log('🗣️ User said:', SpeechResult);
+      try {
+        // Get or create conversation session
+        const session = await VoiceConversationFlowService.getOrCreateSession(CallSid, From);
+        
+        // Process the input through the flow system
+        const result = await VoiceConversationFlowService.processInput(
+          session.currentNodeId,
+          SpeechResult || '',
+          CallSid
+        );
       
-      // Check for goodbye/end conversation
-      if (speech.includes('goodbye') || speech.includes('bye') || speech.includes('thank') || 
-          speech.includes('that\'s all') || speech.includes('no') && speech.includes('thanks')) {
-        const twiml = `<?xml version="1.0" encoding="UTF-8"?>
+      console.log('🤖 AI Response:', result.message.substring(0, 100) + '...');
+      
+      // Generate TwiML response
+        let twiml: string;
+        
+        if (result.shouldEnd) {
+        // End the conversation
+        twiml = `<?xml version="1.0" encoding="UTF-8"?>
           <Response>
-            <Say voice="alice">Thank you for calling Glo Head Spa! Have a wonderful day!</Say>
+            <Say voice="alice">${result.message}</Say>
             <Hangup/>
           </Response>`;
-        res.set('Content-Type', 'text/xml');
-        return res.send(twiml);
+      } else {
+        // Continue the conversation
+        const timeout = result.timeout || 10;
+        const speechTimeout = result.speechTimeout || 3;
+        
+        twiml = `<?xml version="1.0" encoding="UTF-8"?>
+          <Response>
+            <Say voice="alice">${result.message}</Say>
+            <Gather input="speech" timeout="${timeout}" speechTimeout="${speechTimeout}" 
+                    action="https://dev-booking-91625-candraczapansky.replit.app/api/webhook/voice/process" 
+                    method="POST">
+              <Say voice="alice">Please tell me how I can help you.</Say>
+            </Gather>
+            <Redirect>https://dev-booking-91625-candraczapansky.replit.app/api/webhook/voice/process</Redirect>
+          </Response>`;
       }
       
-      // Generate appropriate response based on what they said
-      if (speech.includes('book') || speech.includes('appointment') || speech.includes('schedule')) {
-        responseText = "I'd love to help you book a head spa treatment! We offer the Signature Head Spa for ninety nine dollars, " +
-                      "Deluxe for one sixty, or our Platinum experience for two twenty. Which one interests you?";
-      } else if (speech.includes('signature')) {
-        responseText = "Great choice! The Signature Head Spa is ninety nine dollars and includes sixty minutes of relaxation. " +
-                      "To complete your booking, please stay on the line and I'll transfer you to our booking system, " +
-                      "or you can call back during business hours. What day works best for you?";
-      } else if (speech.includes('yes') || speech.includes('yeah') || speech.includes('sure')) {
-        responseText = "Wonderful! Which service interests you? The Signature for ninety nine, Deluxe for one sixty, " +
-                      "or our Platinum experience for two twenty?";
-      } else if (speech.includes('price') || speech.includes('cost') || speech.includes('how much')) {
-        responseText = "Our head spa treatments start at ninety nine dollars for the Signature, one sixty for Deluxe, " +
-                      "and two twenty for our Platinum experience. We also offer facial treatments. " +
-                      "Which service would you like to know more about?";
-      } else if (speech.includes('hours') || speech.includes('open') || speech.includes('time')) {
-        responseText = "Glo Head Spa is open Monday through Saturday from nine AM to seven PM, " +
-                      "and Sundays from ten AM to five PM. Would you like to schedule an appointment?";
-      } else if (speech.includes('what') && speech.includes('head spa')) {
-        responseText = "A head spa is a relaxing Japanese scalp treatment that includes deep cleansing, " +
-                      "massage, and hair treatment. It's amazing for relaxation and hair health! " +
-                      "Our treatments range from sixty to one twenty minutes. Would you like to book one?";
-      } else {
-        responseText = "I'd be happy to help! You can ask about booking appointments, our services, " +
-                      "pricing, or business hours. What would you like to know?";
-      }
+      res.set('Content-Type', 'text/xml');
+      res.send(twiml);
+    } catch (error) {
+      console.error('❌ Error in voice processing:', error);
+      
+      // Fallback response
+      const twiml = `<?xml version="1.0" encoding="UTF-8"?>
+        <Response>
+          <Say voice="alice">I'm sorry, I'm having trouble processing your request. Please try again later or call during business hours.</Say>
+          <Hangup/>
+        </Response>`;
+      
+      res.set('Content-Type', 'text/xml');
+      res.send(twiml);
     }
-    
-    const twiml = `<?xml version="1.0" encoding="UTF-8"?>
-      <Response>
-        <Say voice="alice">${responseText}</Say>
-        <Gather input="speech" timeout="10" speechTimeout="3" 
-                action="https://dev-booking-91625-candraczapansky.replit.app/api/webhook/voice/process" method="POST">
-          <Say voice="alice">Is there anything else I can help you with?</Say>
-        </Gather>
-        <Redirect>https://dev-booking-91625-candraczapansky.replit.app/api/webhook/voice/process</Redirect>
-      </Response>`;
-    
-    res.set('Content-Type', 'text/xml');
-    res.send(twiml);
   });
 
   return server;

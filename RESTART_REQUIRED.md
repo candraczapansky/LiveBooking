@@ -31,3 +31,5 @@ npm run dev
 - **Cancel All Future**: Cancels all future appointments in the series
 
 The database will automatically be updated with the new column when you restart the server.
+
+

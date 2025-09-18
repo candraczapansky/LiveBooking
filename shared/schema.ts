@@ -1468,6 +1468,61 @@ export type NoteHistory = typeof noteHistory.$inferSelect;
 export type InsertNoteHistory = z.infer<typeof insertNoteHistorySchema>;
 export type UpdateNoteHistory = z.infer<typeof updateNoteHistorySchema>;
 
+// Voice Conversation Flows for AI Voice Responder
+export const voiceConversationFlows = pgTable("voice_conversation_flows", {
+  id: serial("id").primaryKey(),
+  name: text("name").notNull(), // e.g., "Main Greeting", "Appointment Booking"
+  nodeType: text("node_type").notNull().default("response"), // "greeting", "question", "response", "end"
+  message: text("message").notNull(), // What the AI says
+  parentId: integer("parent_id"), // Links to parent node for flow
+  expectedInputs: json("expected_inputs"), // Array of expected keywords/phrases
+  nextNodeId: integer("next_node_id"), // Default next node
+  branches: json("branches"), // Conditional branches based on input
+  isActive: boolean("is_active").default(true),
+  isRoot: boolean("is_root").default(false), // Starting point of conversation
+  timeout: integer("timeout").default(10), // Seconds to wait for response
+  speechTimeout: integer("speech_timeout").default(3), // Seconds of silence
+  orderIndex: integer("order_index").default(0), // For ordering nodes in UI
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertVoiceConversationFlowSchema = createInsertSchema(voiceConversationFlows).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const updateVoiceConversationFlowSchema = createInsertSchema(voiceConversationFlows).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+}).partial();
+
+export type VoiceConversationFlow = typeof voiceConversationFlows.$inferSelect;
+export type InsertVoiceConversationFlow = z.infer<typeof insertVoiceConversationFlowSchema>;
+export type UpdateVoiceConversationFlow = z.infer<typeof updateVoiceConversationFlowSchema>;
+
+// Voice conversation flow session tracking
+export const voiceConversationSessions = pgTable("voice_conversation_sessions", {
+  id: serial("id").primaryKey(),
+  callSid: text("call_sid").notNull().unique(), // Twilio Call SID
+  currentNodeId: integer("current_node_id"), // Current position in flow
+  phoneNumber: text("phone_number"), // Caller's phone number
+  clientId: integer("client_id"), // If matched to a client
+  conversationData: json("conversation_data"), // Store conversation context
+  startedAt: timestamp("started_at").defaultNow(),
+  endedAt: timestamp("ended_at"),
+});
+
+export const insertVoiceConversationSessionSchema = createInsertSchema(voiceConversationSessions).omit({
+  id: true,
+  startedAt: true,
+});
+
+export type VoiceConversationSession = typeof voiceConversationSessions.$inferSelect;
+export type InsertVoiceConversationSession = z.infer<typeof insertVoiceConversationSessionSchema>;
+
 // Permission schema types and validation schemas
 export const insertPermissionGroupSchema = createInsertSchema(permissionGroups).omit({
   id: true,

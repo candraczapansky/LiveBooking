@@ -267,14 +267,7 @@ export function registerSmsAutoRespondRoutes(app: Express, storage: IStorage) {
         return res.status(400).send('Missing parameters');
       }
 
-      // Disconnect specific number from AI SMS responder
-      try {
-        const toDigits = to.replace(/\D/g, '').slice(-10);
-        if (toDigits === '9187277348') {
-          res.set('Content-Type', 'text/xml');
-          return res.send('<Response></Response>');
-        }
-      } catch {}
+      // Note: AI SMS responder is now enabled for all numbers
 
       console.log('📨 Incoming SMS webhook', { from, to, bodyPreview: body.slice(0, 80), messageId });
 
@@ -294,18 +287,58 @@ export function registerSmsAutoRespondRoutes(app: Express, storage: IStorage) {
         return res.send(`<Response><Message>${msg}</Message></Response>`);
       }
 
-      const result = await smsService.processIncomingSMS({
-        from,
-        to,
-        body,
-        timestamp: new Date().toISOString(),
-        messageId
-      });
+      // Forward to Python AI responder
+      try {
+        const pythonResponse = await fetch('http://localhost:8000/webhook/sms', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+          },
+          body: new URLSearchParams({
+            From: from,
+            To: to,
+            Body: body,
+            MessageSid: messageId,
+            AccountSid: 'AC2f2ec0300713e653facec924bfa07ba6',
+            NumMedia: '0'
+          })
+        });
 
-      // Always provide an immediate TwiML acknowledgement so the sender sees a reply instantly.
-      res.set('Content-Type', 'text/xml');
-      const ack = escapeForXml('Thanks! We\'ll text you shortly.');
-      return res.send(`<Response><Message>${ack}</Message></Response>`);
+        if (pythonResponse.ok) {
+          const result = await pythonResponse.json();
+          console.log('✅ Got response from Python AI responder:', result);
+          
+          // Return empty TwiML since Python already sent the SMS
+          res.set('Content-Type', 'text/xml');
+          return res.send('<Response></Response>');
+        } else {
+          console.error('❌ Python responder returned error:', pythonResponse.status);
+          // Fall back to original processing
+          const result = await smsService.processIncomingSMS({
+            from,
+            to,
+            body,
+            timestamp: new Date().toISOString(),
+            messageId
+          });
+          res.set('Content-Type', 'text/xml');
+          const ack = escapeForXml('Thanks! We\'ll text you shortly.');
+          return res.send(`<Response><Message>${ack}</Message></Response>`);
+        }
+      } catch (pythonError) {
+        console.error('❌ Failed to reach Python responder:', pythonError);
+        // Fall back to original processing
+        const result = await smsService.processIncomingSMS({
+          from,
+          to,
+          body,
+          timestamp: new Date().toISOString(),
+          messageId
+        });
+        res.set('Content-Type', 'text/xml');
+        const ack = escapeForXml('Thanks! We\'ll text you shortly.');
+        return res.send(`<Response><Message>${ack}</Message></Response>`);
+      }
     } catch (err: any) {
       res.status(500).send('<Response></Response>');
     }
@@ -316,6 +349,7 @@ export function registerSmsAutoRespondRoutes(app: Express, storage: IStorage) {
     '/sms',
     '/sms/webhook',
     '/api/sms/webhook',
+    '/api/webhook/incoming-sms',  // This is the URL configured in Twilio!
     '/incoming-sms',
     '/message',
     '/messages',
@@ -334,14 +368,7 @@ export function registerSmsAutoRespondRoutes(app: Express, storage: IStorage) {
         return res.status(400).send('<Response></Response>');
       }
 
-      // Disconnect specific number from AI SMS responder
-      try {
-        const toDigits = to.replace(/\D/g, '').slice(-10);
-        if (toDigits === '9187277348') {
-          res.set('Content-Type', 'text/xml');
-          return res.send('<Response></Response>');
-        }
-      } catch {}
+      // Note: AI SMS responder is now enabled for all numbers
 
       console.log('📨 Incoming SMS webhook (alias)', { from, to, bodyPreview: body.slice(0, 80), messageId });
 
@@ -361,17 +388,58 @@ export function registerSmsAutoRespondRoutes(app: Express, storage: IStorage) {
         return res.send(`<Response><Message>${msg}</Message></Response>`);
       }
 
-      const result = await smsService.processIncomingSMS({
-        from,
-        to,
-        body,
-        timestamp: new Date().toISOString(),
-        messageId
-      });
+      // Forward to Python AI responder (same as main webhook)
+      try {
+        const pythonResponse = await fetch('http://localhost:8000/webhook/sms', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+          },
+          body: new URLSearchParams({
+            From: from,
+            To: to,
+            Body: body,
+            MessageSid: messageId,
+            AccountSid: 'AC2f2ec0300713e653facec924bfa07ba6',
+            NumMedia: '0'
+          })
+        });
 
-      res.set('Content-Type', 'text/xml');
-      const ack = escapeForXml('Thanks! We\'ll text you shortly.');
-      return res.send(`<Response><Message>${ack}</Message></Response>`);
+        if (pythonResponse.ok) {
+          const result = await pythonResponse.json();
+          console.log('✅ Got response from Python AI responder:', result);
+          
+          // Return empty TwiML since Python already sent the SMS
+          res.set('Content-Type', 'text/xml');
+          return res.send('<Response></Response>');
+        } else {
+          console.error('❌ Python responder returned error:', pythonResponse.status);
+          // Fall back to original processing
+          const result = await smsService.processIncomingSMS({
+            from,
+            to,
+            body,
+            timestamp: new Date().toISOString(),
+            messageId
+          });
+          res.set('Content-Type', 'text/xml');
+          const ack = escapeForXml('Thanks! We\'ll text you shortly.');
+          return res.send(`<Response><Message>${ack}</Message></Response>`);
+        }
+      } catch (pythonError) {
+        console.error('❌ Failed to reach Python responder:', pythonError);
+        // Fall back to original processing
+        const result = await smsService.processIncomingSMS({
+          from,
+          to,
+          body,
+          timestamp: new Date().toISOString(),
+          messageId
+        });
+        res.set('Content-Type', 'text/xml');
+        const ack = escapeForXml('Thanks! We\'ll text you shortly.');
+        return res.send(`<Response><Message>${ack}</Message></Response>`);
+      }
     } catch {
       res.status(500).send('<Response></Response>');
     }

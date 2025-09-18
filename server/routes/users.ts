@@ -74,6 +74,18 @@ export function registerUserRoutes(app: Express, storage: IStorage) {
   app.post("/api/clients", validateBody(insertClientSchema), async (req, res) => {
     try {
       const data = req.body as z.infer<typeof insertClientSchema>;
+      
+      // Log the incoming data to debug SMS preferences
+      console.log("📱 [CREATE CLIENT] Incoming data from booking widget:", {
+        firstName: data.firstName,
+        lastName: data.lastName,
+        email: data.email,
+        phone: data.phone,
+        smsAppointmentReminders: data.smsAppointmentReminders,
+        emailAppointmentReminders: data.emailAppointmentReminders,
+        hasSmsPref: 'smsAppointmentReminders' in data,
+        hasEmailPref: 'emailAppointmentReminders' in data
+      });
 
       // Basic duplicate checks
       const existingEmail = await storage.getUserByEmail(data.email);

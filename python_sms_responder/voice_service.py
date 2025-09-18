@@ -28,6 +28,12 @@ class VoiceService:
         self.twilio_phone_number = os.getenv('TWILIO_PHONE_NUMBER')
         self.openai_api_key = os.getenv('OPENAI_API_KEY')
         
+        # Voice configuration - Use Amazon Polly voices for better quality
+        # Options: Polly.Joanna (US female), Polly.Amy (UK female), Polly.Matthew (US male)
+        # Polly.Salli (US female, younger voice), Polly.Nicole (Australian female)
+        self.voice_name = os.getenv('TWILIO_VOICE', 'Polly.Joanna')  # Natural female voice
+        self.voice_language = os.getenv('TWILIO_VOICE_LANGUAGE', 'en-US')
+        
         # Initialize Twilio client
         if self.twilio_account_sid and self.twilio_auth_token:
             self.twilio_client = Client(self.twilio_account_sid, self.twilio_auth_token)
@@ -47,33 +53,37 @@ class VoiceService:
         
         # Glo Head Spa context for the AI voice assistant
         self.salon_context = """
-        You are a friendly, enthusiastic receptionist at Glo Head Spa in Tulsa. Your role is to:
-        1. Greet callers warmly with enthusiasm and make them feel welcomed
-        2. Help with head spa appointment bookings and inquiries
-        3. Answer questions about our specialized head spa treatments
-        4. Provide information about services and pricing
-        5. Handle general inquiries with a bubbly, professional tone
+        You are a friendly, enthusiastic receptionist at Glo Head Spa in Tulsa. 
         
-        Key information about Glo Head Spa:
-        - Open Monday-Saturday 9AM-7PM, Sunday 10AM-5PM
-        - Phone: (918) 727-7348
+        CRITICAL FOR VOICE: Generate responses that sound natural when spoken aloud:
+        - Use short, simple sentences
+        - Avoid complex punctuation or parentheses
+        - Be conversational and warm
+        - Sound enthusiastic but natural, not overly formal
+        
+        Your role:
+        1. Greet callers warmly and make them feel welcomed
+        2. Help with head spa appointment bookings
+        3. Answer questions about our treatments
+        4. Provide service and pricing information
+        5. Be bubbly and professional
+        
+        Glo Head Spa Information:
+        - Hours: Monday to Saturday 9AM to 7PM, Sunday 10AM to 5PM
+        - Phone: 918-727-7348
         - We specialize in Japanese head spa treatments
         
-        Services offered:
-        - Signature Head Spa ($99, 60 minutes) - Our signature Japanese scalp treatment
-        - Deluxe Head Spa ($160, 90 minutes) - Extended session with premium treatments
-        - Platinum Head Spa ($220, 120 minutes) - Ultimate luxury experience
-        - Korean Glass Skin Facial ($130, 60 minutes) - For radiant skin
-        - Buccal Massage Facial ($190, 90 minutes) - Facial contouring massage
+        Our Services:
+        - Signature Head Spa: 99 dollars for 60 minutes - Japanese scalp treatment
+        - Deluxe Head Spa: 160 dollars for 90 minutes - Extended premium session
+        - Platinum Head Spa: 220 dollars for 120 minutes - Ultimate luxury
+        - Korean Glass Skin Facial: 130 dollars for 60 minutes
+        - Buccal Massage Facial: 190 dollars for 90 minutes
         
-        Important: Be enthusiastic and friendly! Make every caller feel special.
-        Keep responses natural and conversational for voice interaction.
-        - Prices range from $25 for basic cuts to $150+ for complex services
-        - We accept walk-ins but recommend appointments
-        - Cancellation policy: 24-hour notice required
+        - Walk-ins welcome but appointments recommended
+        - 24 hour cancellation notice required
         
-        Always be polite, professional, and helpful. If you can't handle a specific request,
-        offer to transfer to a human or take a message.
+        Remember: Keep responses brief, warm, and natural for voice conversation.
         """
     
     def check_health(self) -> Dict:
@@ -113,11 +123,11 @@ class VoiceService:
         try:
             response = VoiceResponse()
             
-            # Add a friendly greeting
+            # Add a friendly greeting with improved natural voice
             response.say(
-                "Hello! Welcome to our salon. I'm your AI assistant. How can I help you today?",
-                voice='alice',
-                language='en-US'
+                "Hello! Welcome to Glo Head Spa. I'm here to help you today. How can I assist you?",
+                voice=self.voice_name,
+                language=self.voice_language
             )
             
             # Get webhook base URL from environment or use default Replit URL
@@ -127,29 +137,30 @@ class VoiceService:
             process_url = f"{webhook_base}/api/webhook/voice/process?call_sid={call_sid}"
             redirect_url = f"{webhook_base}/api/webhook/voice?call_sid={call_sid}"
             
-            # Configure speech recognition
+            # Configure speech recognition with optimized settings
             gather = response.gather(
                 input='speech',
                 action=process_url,
                 method='POST',
                 speech_timeout='auto',
-                speech_model='phone_call',
+                speech_model='experimental_conversations',  # Better speech recognition
                 enhanced='true',
-                language='en-US'
+                language='en-US',
+                profanity_filter=False  # Better accuracy
             )
             
             # Fallback if no speech detected
             gather.say(
                 "I didn't catch that. Could you please repeat your request?",
-                voice='alice',
-                language='en-US'
+                voice=self.voice_name,
+                language=self.voice_language
             )
             
             # If no input after gather, repeat the greeting
             response.say(
                 "I'm still here to help. Please let me know what you need.",
-                voice='alice',
-                language='en-US'
+                voice=self.voice_name,
+                language=self.voice_language
             )
             response.redirect(redirect_url)
             
@@ -163,8 +174,8 @@ class VoiceService:
             response = VoiceResponse()
             response.say(
                 "Thank you for calling our salon. Please hold while I connect you to our staff.",
-                voice='alice',
-                language='en-US'
+                voice=self.voice_name if hasattr(self, 'voice_name') else 'Polly.Joanna',
+                language=self.voice_language if hasattr(self, 'voice_language') else 'en-US'
             )
             return str(response)
     
@@ -178,18 +189,22 @@ class VoiceService:
             # Generate AI response
             ai_response = self._generate_ai_response(call_sid, user_speech)
             
-            # Speak the AI response
+            # Speak the AI response with natural voice and pauses
+            formatted_response = self._format_response_for_speech(ai_response)
             response.say(
-                ai_response,
-                voice='alice',
-                language='en-US'
+                formatted_response,
+                voice=self.voice_name,
+                language=self.voice_language
             )
+            
+            # Natural pause before follow-up question
+            response.pause(length=1)
             
             # Ask if they need anything else
             response.say(
                 "Is there anything else I can help you with?",
-                voice='alice',
-                language='en-US'
+                voice=self.voice_name,
+                language=self.voice_language
             )
             
             # Continue listening for more input
@@ -206,23 +221,24 @@ class VoiceService:
                 action=process_url,
                 method='POST',
                 speech_timeout='auto',
-                speech_model='phone_call',
+                speech_model='experimental_conversations',
                 enhanced='true',
-                language='en-US'
+                language='en-US',
+                profanity_filter=False
             )
             
             # Fallback if no speech detected
             gather.say(
                 "I didn't hear anything. Please let me know if you need further assistance.",
-                voice='alice',
-                language='en-US'
+                voice=self.voice_name,
+                language=self.voice_language
             )
             
             # If no input, end the call gracefully
             response.say(
-                "Thank you for calling our salon. Have a wonderful day!",
-                voice='alice',
-                language='en-US'
+                "Thank you for calling Glo Head Spa. Have a wonderful day!",
+                voice=self.voice_name,
+                language=self.voice_language
             )
             response.hangup()
             
@@ -234,10 +250,26 @@ class VoiceService:
             response = VoiceResponse()
             response.say(
                 "I'm sorry, I'm having trouble processing your request. Let me connect you to our staff.",
-                voice='alice',
-                language='en-US'
+                voice=self.voice_name if hasattr(self, 'voice_name') else 'Polly.Joanna',
+                language=self.voice_language if hasattr(self, 'voice_language') else 'en-US'
             )
             return str(response)
+    
+    def _format_response_for_speech(self, text: str) -> str:
+        """
+        Format text for more natural speech output using SSML
+        Adds pauses and emphasis for better voice quality
+        """
+        # Add natural pauses after sentences
+        text = text.replace('. ', '. <break time="500ms"/>')
+        text = text.replace('? ', '? <break time="500ms"/>')
+        text = text.replace('! ', '! <break time="500ms"/>')
+        
+        # Add slight pauses after commas
+        text = text.replace(', ', ', <break time="200ms"/>')
+        
+        # Wrap in speak tags for SSML support
+        return f'<speak>{text}</speak>'
     
     def _generate_ai_response(self, call_sid: str, user_speech: str) -> str:
         """

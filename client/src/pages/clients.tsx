@@ -82,7 +82,6 @@ import ClientNoteHistory from "@/components/client/client-note-history";
 
 import { PermissionGuard } from "@/components/permissions/PermissionGuard";
 import { SaveCardModal } from "@/components/payment/save-card-modal";
-import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from "@/components/ui/accordion";
 type Client = {
   id: number;
   username: string;
@@ -1717,17 +1716,10 @@ const ClientsPage = () => {
                   />
                 )}
 
-                {/* Appointment History (Dropdown) */}
+                {/* Appointment History */}
                 {clientDetail && (
                   <div className="mt-4">
-                    <Accordion type="single" collapsible>
-                      <AccordionItem value="appointment-history">
-                        <AccordionTrigger>Appointment History</AccordionTrigger>
-                        <AccordionContent>
-                          <ClientAppointmentHistory clientId={clientDetail.id} />
-                        </AccordionContent>
-                      </AccordionItem>
-                    </Accordion>
+                    <ClientAppointmentHistory clientId={clientDetail.id} />
                   </div>
                 )}
 

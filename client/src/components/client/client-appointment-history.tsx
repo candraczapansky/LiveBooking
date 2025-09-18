@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Calendar, Clock, DollarSign, User } from "lucide-react";
-
+import { apiRequest } from "@/lib/queryClient";
 
 import { format } from "date-fns";
 
@@ -44,7 +44,7 @@ export default function ClientAppointmentHistory({ clientId, currentAppointmentS
   const { data: appointments, isLoading } = useQuery({
     queryKey: ['/api/appointments/client', clientId],
     queryFn: async () => {
-      const response = await fetch(`/api/appointments/client/${clientId}`);
+      const response = await apiRequest("GET", `/api/appointments/client/${clientId}`);
       if (!response.ok) throw new Error('Failed to fetch client appointments');
       return response.json();
     }
