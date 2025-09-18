@@ -1,9 +1,10 @@
 import os
+import json
 from openai import OpenAI
 import logging
 from typing import Optional, Dict, Any
-from .models import ClientInfo, LLMRequest, LLMResponse
-from .conversation_manager import ConversationManager
+from models import ClientInfo, LLMRequest, LLMResponse
+from conversation_manager import ConversationManager
 
 class LLMService:
     """Service for handling LLM operations via OpenAI"""
@@ -17,7 +18,7 @@ class LLMService:
         self.logger = logging.getLogger(__name__)
         
         # Default model and parameters
-        self.model = "gpt-4"
+        self.model = os.getenv("OPENAI_MODEL", "gpt-4")
         self.max_tokens = 150
         self.temperature = 0.7
         
@@ -28,28 +29,33 @@ class LLMService:
         self.system_prompt = self._get_system_prompt()
     
     def _get_system_prompt(self) -> str:
-        """Get the system prompt for salon SMS responses"""
-        return """You are an AI assistant for a professional salon. Your role is to help clients with appointment-related inquiries via SMS. 
+        """Get the system prompt for Glo Head Spa SMS responses"""
+        return """You are an AI assistant for Glo Head Spa, a luxury head spa in Tulsa specializing in Japanese scalp treatments. 
 
-Key responsibilities:
-- Help clients book, reschedule, or cancel appointments
-- Provide information about services and pricing
-- Answer questions about salon policies and hours
-- Be friendly, professional, and concise
-- Keep responses under 160 characters when possible
-- If you can't handle a request, offer to have someone call them
+PERSONALITY:
+- Be super friendly, bubbly, and enthusiastic! 💆‍♀️✨
+- Keep responses concise (under 160 chars for SMS)
+- Always maintain a positive, welcoming tone
+- Make every client feel special and valued!
 
-Important guidelines:
-- Always be polite and professional
-- Keep responses brief and clear
-- If you need more information, ask specific questions
-- For complex requests, offer to have a staff member call them
-- Don't make up information about services or pricing
-- If unsure about availability, suggest they call the salon
+SERVICES WE OFFER (ONLY THESE):
+- Signature Head Spa ($99, 60min)
+- Deluxe Head Spa ($160, 90min)  
+- Platinum Head Spa ($220, 120min)
+- Korean Glass Skin Facial ($130, 60min)
+- Buccal Massage Facial ($190, 90min)
+- Face Lifting Massage Facial ($150, 60min)
 
-Current salon hours: Monday-Saturday 9AM-7PM, Sunday 10AM-5PM
-Address: [Salon Address]
-Phone: [Salon Phone]"""
+KEY RULES:
+- ONLY mention services listed above - NO exceptions
+- For simple greetings (Hi/Hello), just welcome them warmly
+- Don't assume booking intent from greetings
+- Times like "9am" are appointment times, not service requests
+- Offer to have staff call for complex requests
+
+Business Hours: Mon-Sat 9AM-7PM, Sun 10AM-5PM
+Phone: (918) 727-7348
+Cancellation: 24hr notice required"""
     
     async def generate_response(
         self, 
@@ -160,6 +166,16 @@ Phone: [Salon Phone]"""
             self.logger.error(f"Error generating LLM response: {str(e)}")
             return "I'm sorry, I'm having trouble processing your request. Please call us directly for assistance."
     
+    def _load_business_knowledge(self) -> Dict:
+        """Load business knowledge from JSON file"""
+        try:
+            knowledge_path = os.path.join(os.path.dirname(__file__), 'business_knowledge.json')
+            with open(knowledge_path, 'r') as f:
+                return json.load(f)
+        except Exception as e:
+            self.logger.error(f"Error loading business knowledge: {str(e)}")
+            return {}
+    
     def _build_prompt(
         self, 
         user_message: str, 
@@ -180,12 +196,14 @@ Phone: [Salon Phone]"""
             str: Formatted prompt
         """
         prompt_parts = []
+        business_knowledge = self._load_business_knowledge()
         
         # Add client context if available
         if client_info:
             prompt_parts.append(f"Client Information:")
             prompt_parts.append(f"- Name: {client_info.name or 'Unknown'}")
             prompt_parts.append(f"- Phone: {client_info.phone}")
+            prompt_parts.append(f"- Client Type: {'Returning' if client_info.total_appointments > 0 else 'New'}")
             if client_info.total_appointments:
                 prompt_parts.append(f"- Total appointments: {client_info.total_appointments}")
             if client_info.last_appointment:
@@ -193,6 +211,17 @@ Phone: [Salon Phone]"""
             if client_info.upcoming_appointments:
                 prompt_parts.append(f"- Upcoming appointments: {len(client_info.upcoming_appointments)}")
             prompt_parts.append("")
+        
+        # Add available services from business knowledge
+        if business_knowledge:
+            services = business_knowledge.get('services', {})
+            if services:
+                prompt_parts.append("Available Services:")
+                for category, service_list in services.items():
+                    if category != 'add_ons' and service_list:  # Skip add-ons for brevity
+                        for service in service_list[:3]:  # Limit to top 3 per category
+                            prompt_parts.append(f"- {service['name']}: {service['price']} ({service['duration']}min)")
+                prompt_parts.append("")
         
         # Add conversation context
         conversation_summary = self.conversation_manager.get_conversation_summary(phone_number)
@@ -207,17 +236,20 @@ Phone: [Salon Phone]"""
                 prompt_parts.append(f"- Selected time: {conversation_summary['selected_time']}")
             prompt_parts.append("")
         
-        # Add context information
-        if context:
-            prompt_parts.append("Additional Context:")
-            for key, value in context.items():
-                prompt_parts.append(f"- {key}: {value}")
+        # Add real-time availability if provided
+        if context and 'available_slots' in context:
+            prompt_parts.append("Available Appointment Times:")
+            slots = context.get('available_slots', {})
+            for date, times in list(slots.items())[:2]:  # Next 2 days
+                if times:
+                    time_list = [t.get('formatted_time', t.get('time', '')) for t in times[:4]]
+                    prompt_parts.append(f"- {date}: {', '.join(time_list)}")
             prompt_parts.append("")
         
         # Add user message
         prompt_parts.append(f"User Message: {user_message}")
         prompt_parts.append("")
-        prompt_parts.append("Please provide a helpful, professional response:")
+        prompt_parts.append("Generate a friendly, helpful response with emojis (max 160 chars):")
         
         return "\n".join(prompt_parts)
     

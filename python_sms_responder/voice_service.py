@@ -45,18 +45,29 @@ class VoiceService:
         # Conversation history storage (in production, use Redis or database)
         self.conversation_history: Dict[str, List[Dict]] = {}
         
-        # Salon context for the AI
+        # Glo Head Spa context for the AI voice assistant
         self.salon_context = """
-        You are a friendly salon receptionist for a beauty salon. Your role is to:
-        1. Greet callers warmly and professionally
-        2. Help with appointment bookings, rescheduling, and cancellations
-        3. Answer questions about services, pricing, and salon hours
-        4. Provide information about stylists and their specialties
-        5. Handle general inquiries about the salon
+        You are a friendly, enthusiastic receptionist at Glo Head Spa in Tulsa. Your role is to:
+        1. Greet callers warmly with enthusiasm and make them feel welcomed
+        2. Help with head spa appointment bookings and inquiries
+        3. Answer questions about our specialized head spa treatments
+        4. Provide information about services and pricing
+        5. Handle general inquiries with a bubbly, professional tone
         
-        Key information about the salon:
+        Key information about Glo Head Spa:
         - Open Monday-Saturday 9AM-7PM, Sunday 10AM-5PM
-        - Services include haircuts, styling, coloring, highlights, treatments
+        - Phone: (918) 727-7348
+        - We specialize in Japanese head spa treatments
+        
+        Services offered:
+        - Signature Head Spa ($99, 60 minutes) - Our signature Japanese scalp treatment
+        - Deluxe Head Spa ($160, 90 minutes) - Extended session with premium treatments
+        - Platinum Head Spa ($220, 120 minutes) - Ultimate luxury experience
+        - Korean Glass Skin Facial ($130, 60 minutes) - For radiant skin
+        - Buccal Massage Facial ($190, 90 minutes) - Facial contouring massage
+        
+        Important: Be enthusiastic and friendly! Make every caller feel special.
+        Keep responses natural and conversational for voice interaction.
         - Prices range from $25 for basic cuts to $150+ for complex services
         - We accept walk-ins but recommend appointments
         - Cancellation policy: 24-hour notice required
@@ -109,15 +120,12 @@ class VoiceService:
                 language='en-US'
             )
             
-            # Get webhook base URL from environment or use relative paths
-            webhook_base = os.getenv('WEBHOOK_BASE_URL', '')
-            if webhook_base:
-                process_url = f"{webhook_base}/webhook/voice/process?call_sid={call_sid}"
-                redirect_url = f"{webhook_base}/webhook/voice?call_sid={call_sid}"
-            else:
-                # Use relative paths - Twilio will use the same domain
-                process_url = f"/webhook/voice/process?call_sid={call_sid}"
-                redirect_url = f"/webhook/voice?call_sid={call_sid}"
+            # Get webhook base URL from environment or use default Replit URL
+            webhook_base = os.getenv('WEBHOOK_BASE_URL', 'https://dev-booking-91625-candraczapansky.replit.app')
+            
+            # Always use absolute URLs for Twilio
+            process_url = f"{webhook_base}/api/webhook/voice/process?call_sid={call_sid}"
+            redirect_url = f"{webhook_base}/api/webhook/voice?call_sid={call_sid}"
             
             # Configure speech recognition
             gather = response.gather(
@@ -289,20 +297,23 @@ class VoiceService:
             # Fallback responses when OpenAI is not available
             user_speech_lower = user_speech.lower()
             
-            if any(word in user_speech_lower for word in ['appointment', 'book', 'schedule', 'reserve']):
-                response = "I'd be happy to help you book an appointment! We're open Monday through Saturday 9AM to 7PM, and Sundays 10AM to 5PM. What day and time would work best for you?"
+            if any(word in user_speech_lower for word in ['appointment', 'book', 'schedule', 'reserve', 'head spa']):
+                response = "I'd love to help you book a head spa treatment! We offer the Signature Head Spa for $99, Deluxe for $160, or our Platinum experience for $220. We're open Monday through Saturday 9AM to 7PM, and Sundays 10AM to 5PM. Which treatment interests you?"
             
             elif any(word in user_speech_lower for word in ['price', 'cost', 'how much', 'fee']):
-                response = "Our services range from $25 for basic cuts to $150+ for complex services. Haircuts start at $25, styling is $35, and coloring starts at $75. Would you like to know more about a specific service?"
+                response = "Our head spa treatments start at $99 for the Signature, $160 for Deluxe, and $220 for our Platinum experience. We also offer Korean Glass Skin Facial for $130 and Buccal Massage Facial for $190. Which service would you like to know more about?"
             
             elif any(word in user_speech_lower for word in ['hour', 'open', 'time', 'when']):
-                response = "We're open Monday through Saturday from 9AM to 7PM, and Sundays from 10AM to 5PM. We accept walk-ins but recommend appointments for the best experience."
+                response = "Glo Head Spa is open Monday through Saturday from 9AM to 7PM, and Sundays from 10AM to 5PM. We recommend booking in advance for the best availability. Would you like to schedule an appointment?"
             
             elif any(word in user_speech_lower for word in ['cancel', 'reschedule', 'change']):
                 response = "I can help you reschedule or cancel your appointment. We require 24-hour notice for cancellations. What's your name and when is your current appointment?"
             
+            elif 'what' in user_speech_lower and 'head spa' in user_speech_lower:
+                response = "A head spa is a relaxing Japanese scalp treatment that includes deep cleansing, massage, and hair treatment. It's amazing for relaxation and hair health! Our treatments range from 60 to 120 minutes. Would you like to book one?"
+            
             elif any(word in user_speech_lower for word in ['service', 'what do you', 'offer']):
-                response = "We offer a full range of salon services including haircuts, styling, coloring, highlights, treatments, and more. Our stylists are experienced in all types of hair and styles. What service are you interested in?"
+                response = "Glo Head Spa specializes in Japanese head spa treatments! We offer Signature, Deluxe, and Platinum head spa experiences, plus facial treatments like Korean Glass Skin and Buccal Massage. What interests you most?"
             
             else:
                 response = "Thank you for your inquiry. I'm here to help with appointments, pricing, hours, and any other questions about our salon. How can I assist you today?"

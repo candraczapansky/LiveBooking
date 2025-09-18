@@ -1978,48 +1978,170 @@ export async function registerRoutes(app: Express, storage: IStorage, autoRenewa
     res.send(twiml);
   });
 
+  // Possible alternate endpoint that Twilio might be configured to use
+  app.post('/api/outbound-api', async (req: Request, res: Response) => {
+    console.log('⚠️ OUTBOUND-API endpoint called! This might be the issue!');
+    console.log('Request body:', JSON.stringify(req.body, null, 2));
+    
+    // Process it like the main webhook
+    const { From, To } = req.body;
+    let dialNumber = To?.toString().trim();
+    
+    // Remove 471 prefix if present
+    if (dialNumber?.startsWith('471')) {
+      dialNumber = dialNumber.substring(3);
+      console.log('Removed 471 prefix in outbound-api:', dialNumber);
+    }
+    
+    // Format as US number
+    if (dialNumber && !dialNumber.startsWith('+')) {
+      if (dialNumber.length === 10) {
+        dialNumber = `+1${dialNumber}`;
+      } else if (dialNumber.length === 11 && dialNumber.startsWith('1')) {
+        dialNumber = `+${dialNumber}`;
+      } else {
+        dialNumber = `+1${dialNumber}`;
+      }
+    }
+    
+    const twiml = `<?xml version="1.0" encoding="UTF-8"?>
+      <Response>
+        <Say>Connecting your call.</Say>
+        <Dial>
+          <Number>${dialNumber}</Number>
+        </Dial>
+      </Response>`;
+    
+    console.log('OUTBOUND-API returning TwiML with number:', dialNumber);
+    res.set('Content-Type', 'text/xml');
+    return res.send(twiml);
+  });
+
+  // Catch-all for any voice-related webhook we might have missed
+  app.all('/api/*voice*', (req: Request, res: Response, next: Function) => {
+    // Only log if this isn't one of our known endpoints
+    const knownPaths = ['/api/webhook/voice', '/api/webhook/voice/status', '/api/webhook/voice/process', '/api/webhook/voice/debug', '/api/webhook/voice/simple', '/api/webhook/voice/test-message'];
+    if (!knownPaths.includes(req.path)) {
+      console.log('🚨 UNKNOWN VOICE ENDPOINT CALLED:', req.method, req.path);
+      console.log('Body:', JSON.stringify(req.body, null, 2));
+    }
+    next();
+  });
+
   app.post('/api/webhook/voice', async (req: Request, res: Response) => {
     try {
-      const { From, To, CallSid } = req.body;
+      const { From, To, CallSid, Direction, CallDirection } = req.body;
       
-      console.log('📞 Voice webhook called:', { From, To, CallSid });
+      console.log('📞 Voice webhook called:', { From, To, CallSid, Direction, CallDirection });
+      console.log('📞 Full request body:', JSON.stringify(req.body, null, 2));
+      
+      // Log the actual values to debug the issue
+      console.log('🔍 CRITICAL DEBUG:');
+      console.log('  From:', From);
+      console.log('  To:', To);
+      console.log('  Direction:', Direction || 'not provided');
+      console.log('  CallDirection:', CallDirection || 'not provided');
       
       // Check if call is from SIP device (your Yealink phone)
       if (From?.includes('sip:')) {
-        // Clean up the To number - remove spaces and ensure proper format
-        let dialNumber = To?.toString().trim();
+        // Extract the dialed number from the To field
+        let toValue = To?.toString().trim();
+        console.log('🔍 Raw To value from Twilio:', toValue);
         
-        // Remove any spaces, dashes, parentheses from the number
-        dialNumber = dialNumber.replace(/[\s\-\(\)]/g, '');
+        let dialNumber = toValue;
         
-        // IMPORTANT: Force US format to prevent international routing
-        if (dialNumber && !dialNumber.startsWith('+')) {
-          // Remove any leading zeros (international format)
-          dialNumber = dialNumber.replace(/^0+/, '');
-          
-          if (dialNumber.startsWith('1') && dialNumber.length === 11) {
-            // US number with country code (1XXXXXXXXXX)
-            dialNumber = `+${dialNumber}`;
-          } else if (dialNumber.length === 10) {
-            // US number without country code (XXXXXXXXXX)
-            dialNumber = `+1${dialNumber}`;
-          } else if (dialNumber.length === 7) {
-            // Local number - add US area code (you may need to change this)
-            dialNumber = `+1918${dialNumber}`; // Using 918 area code as default
+        // CRITICAL FIX: Properly extract number from SIP URI
+        // Twilio might send:
+        // - sip:19185048902@glo-head-spa-phones.sip.twilio.com:5060 (SIP format)
+        // - sip:4719185048902@glo-head-spa-phones.sip.twilio.com:5060 (SIP with 471 prefix)
+        // - 4719185048902 (raw number with Yealink prefix)
+        // - 19185048902 (raw US number)
+        if (toValue && toValue.includes('sip:')) {
+          // Extract number from SIP URI
+          const sipMatch = toValue.match(/sip:([0-9+]+)@/);
+          if (sipMatch && sipMatch[1]) {
+            dialNumber = sipMatch[1];
+            console.log('✅ Extracted from SIP URI:', dialNumber);
           } else {
-            // For any other format, assume US and prepend +1
-            console.log('⚠️ Unusual number format:', dialNumber, 'Length:', dialNumber.length);
-            if (!dialNumber.startsWith('1')) {
-              dialNumber = `+1${dialNumber}`;
-            } else {
+            // Fallback: split method
+            const afterSip = toValue.split('sip:')[1];
+            if (afterSip) {
+              dialNumber = afterSip.split('@')[0];
+              console.log('✅ Extracted via split:', dialNumber);
+            }
+          }
+        } else if (toValue && toValue.includes('@')) {
+          // Handle format without sip: prefix
+          dialNumber = toValue.split('@')[0];
+          console.log('✅ Extracted from @ format:', dialNumber);
+        }
+        
+        // Clean the number - remove any non-numeric characters except +
+        dialNumber = dialNumber?.replace(/[^0-9+]/g, '') || '';
+        console.log('📞 Cleaned number:', dialNumber);
+        
+        // CRITICAL FIX: Remove Yealink 471 prefix and normalize
+        let digitsOnly = dialNumber.replace(/\D/g, '');
+        console.log('🔍 Normalization - digits:', digitsOnly, 'length:', digitsOnly.length);
+        
+        // Handle different cases of 471 prefix
+        if (digitsOnly.startsWith('471')) {
+          console.log('⚠️ FOUND 471 PREFIX - Processing...');
+          if (digitsOnly.length === 13) {
+            // Exact case: 471 + 10-digit US number (4719185048902 -> 9185048902)
+            digitsOnly = digitsOnly.substring(3);
+            console.log('✅ Removed 471 prefix from 13-digit number:', digitsOnly);
+          } else if (digitsOnly.length === 14 && digitsOnly.startsWith('4711')) {
+            // Case: 471 + 11-digit US number (47119185048902 -> 19185048902)
+            digitsOnly = digitsOnly.substring(3);
+            console.log('✅ Removed 471 prefix from 14-digit number:', digitsOnly);
+          } else if (digitsOnly.length === 10 && digitsOnly.startsWith('471')) {
+            // Case: 471 + 7-digit local (4715048902 -> 918 + 5048902)
+            const last7 = digitsOnly.substring(3);
+            digitsOnly = `918${last7}`;
+            console.log('✅ Converted 471+7-digit to 918 area code:', digitsOnly);
+          } else {
+            console.log('❌ 471 prefix found but no matching pattern - length:', digitsOnly.length);
+          }
+        } else {
+          console.log('ℹ️ No 471 prefix found in:', digitsOnly);
+        }
+        
+        // Now format as US number
+        if (!dialNumber.startsWith('+')) {
+          dialNumber = digitsOnly;
+          
+          if (dialNumber.length === 10) {
+            // 10-digit US number: 9185048902 -> +19185048902
+            dialNumber = `+1${dialNumber}`;
+            console.log('✅ Formatted as 10-digit US number');
+          } else if (dialNumber.length === 11 && dialNumber.startsWith('1')) {
+            // 11-digit US number: 19185048902 -> +19185048902
+            dialNumber = `+${dialNumber}`;
+            console.log('✅ Formatted as 11-digit US number');
+          } else if (dialNumber.length === 7) {
+            // Local 7-digit: add 918 area code
+            dialNumber = `+1918${dialNumber}`;
+            console.log('✅ Formatted as local number with 918 area code');
+          } else if (dialNumber.length === 8 && dialNumber.startsWith('1')) {
+            // 1 + 7-digit local: 15048902 -> +19185048902
+            const last7 = dialNumber.substring(1);
+            dialNumber = `+1918${last7}`;
+            console.log('✅ Converted 1+7-digit to 918 area code');
+          } else {
+            // Any other format - try to make it US
+            console.log('⚠️ Unexpected number format, length:', dialNumber.length);
+            if (dialNumber.startsWith('1')) {
               dialNumber = `+${dialNumber}`;
+            } else {
+              dialNumber = `+1${dialNumber}`;
             }
           }
         }
         
-        console.log('📞 Original To number:', To);
-        console.log('📞 Formatted dial number:', dialNumber);
-        console.log('📞 Number length:', dialNumber?.length);
+        console.log('📞 Original To:', To);
+        console.log('📞 Final dial number:', dialNumber);
+        console.log('📞 Final length:', dialNumber?.length);
         
         // Outbound call from Yealink - connect the call
         // IMPORTANT: This MUST be your actual Twilio phone number or a verified caller ID
@@ -2063,20 +2185,45 @@ export async function registerRoutes(app: Express, storage: IStorage, autoRenewa
             <Say>The call could not be completed. Please check the number and try again.</Say>
           </Response>`;
         
-        res.set('Content-Type', 'text/xml');
-        return res.send(twiml);
-      } else {
-        // Inbound call - route to Yealink phone
-        const twiml = `<?xml version="1.0" encoding="UTF-8"?>
-          <Response>
-            <Say>Thank you for calling. Please hold while we connect you.</Say>
-            <Dial>
-              <Sip>sip:yealink1@glo-head-spa-phones.sip.twilio.com</Sip>
-            </Dial>
-          </Response>`;
+        console.log('📞 FINAL TwiML being sent to Twilio:');
+        console.log(twiml);
+        console.log('📞 Extracted Number element:', dialNumber);
         
         res.set('Content-Type', 'text/xml');
         return res.send(twiml);
+      } else {
+        // Inbound call - route to Yealink phone with AI fallback
+        const useAI = req.query.ai === 'true' || process.env.USE_AI_RESPONDER === 'true';
+        
+        if (useAI) {
+          // AI voice responder mode
+          const twiml = `<?xml version="1.0" encoding="UTF-8"?>
+            <Response>
+              <Gather input="speech" timeout="3" speechTimeout="auto" 
+                      action="/api/webhook/voice/process" method="POST">
+                <Say voice="alice">
+                  Hello! Thank you for calling Glo Head Spa! I'm so excited to help you today. 
+                  Are you calling to book one of our amazing head spa treatments or do you have questions about our services?
+                </Say>
+              </Gather>
+              <Say voice="alice">
+                I'm still here to help. Please let me know what you need.
+              </Say>
+            </Response>`;
+          res.set('Content-Type', 'text/xml');
+          return res.send(twiml);
+        } else {
+          // Normal mode - route to Yealink phone
+          const twiml = `<?xml version="1.0" encoding="UTF-8"?>
+            <Response>
+              <Say>Thank you for calling. Please hold while we connect you.</Say>
+              <Dial timeout="15" action="/api/webhook/voice/no-answer">
+                <Sip>sip:yealink1@glo-head-spa-phones.sip.twilio.com</Sip>
+              </Dial>
+            </Response>`;
+          res.set('Content-Type', 'text/xml');
+          return res.send(twiml);
+        }
       }
     } catch (error) {
       console.error('Error in voice webhook:', error);
@@ -2092,11 +2239,101 @@ export async function registerRoutes(app: Express, storage: IStorage, autoRenewa
     res.status(200).send('OK');
   });
 
+  // No answer handler - when Yealink doesn't pick up
+  app.post('/api/webhook/voice/no-answer', async (req: Request, res: Response) => {
+    console.log('📞 Yealink did not answer, falling back to AI');
+    const { DialCallStatus, CallSid, From, To } = req.body;
+    
+    if (DialCallStatus === 'no-answer' || DialCallStatus === 'busy' || DialCallStatus === 'failed') {
+      try {
+        // Forward to Python AI responder
+        const pythonUrl = process.env.PYTHON_AI_URL || 'http://localhost:8000';
+        const response = await fetch(`${pythonUrl}/webhook/voice`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/x-www-form-urlencoded'
+          },
+          body: new URLSearchParams({
+            CallSid: CallSid || '',
+            From: From || '',
+            To: To || '',
+            CallStatus: 'ringing',
+            AccountSid: req.body.AccountSid || ''
+          })
+        });
+        
+        if (response.ok) {
+          const twimlResponse = await response.text();
+          console.log('✅ Got TwiML from Python AI responder');
+          res.set('Content-Type', 'text/xml');
+          return res.send(twimlResponse);
+        }
+      } catch (error) {
+        console.error('Error forwarding to Python AI:', error);
+      }
+      
+      // Fallback if Python service is down
+      const twiml = `<?xml version="1.0" encoding="UTF-8"?>
+        <Response>
+          <Say voice="alice">
+            Sorry, all our representatives are busy. Please try calling back later or leave a message.
+          </Say>
+        </Response>`;
+      res.set('Content-Type', 'text/xml');
+      return res.send(twiml);
+    } else {
+      // Call was answered or completed
+      res.set('Content-Type', 'text/xml');
+      res.send('<Response><Hangup/></Response>');
+    }
+  });
+
   // Voice processing webhook (for speech/DTMF input if needed)
   app.post('/api/webhook/voice/process', async (req: Request, res: Response) => {
     console.log('📞 Voice processing:', req.body);
+    const { SpeechResult } = req.body;
+    
+    let responseText = "Thank you for calling Glo Head Spa!";
+    
+    if (SpeechResult) {
+      const speech = SpeechResult.toLowerCase();
+      console.log('🗣️ User said:', SpeechResult);
+      
+      // Generate appropriate response based on what they said
+      if (speech.includes('book') || speech.includes('appointment') || speech.includes('schedule')) {
+        responseText = "I'd love to help you book a head spa treatment! We offer the Signature Head Spa for $99, " +
+                      "Deluxe for $160, or our Platinum experience for $220. Which one interests you?";
+      } else if (speech.includes('price') || speech.includes('cost') || speech.includes('how much')) {
+        responseText = "Our head spa treatments start at $99 for the Signature, $160 for Deluxe, " +
+                      "and $220 for our Platinum experience. We also offer facial treatments. " +
+                      "Which service would you like to know more about?";
+      } else if (speech.includes('hours') || speech.includes('open') || speech.includes('time')) {
+        responseText = "Glo Head Spa is open Monday through Saturday from 9AM to 7PM, " +
+                      "and Sundays from 10AM to 5PM. Would you like to schedule an appointment?";
+      } else if (speech.includes('what') && speech.includes('head spa')) {
+        responseText = "A head spa is a relaxing Japanese scalp treatment that includes deep cleansing, " +
+                      "massage, and hair treatment. It's amazing for relaxation and hair health! " +
+                      "Our treatments range from 60 to 120 minutes. Would you like to book one?";
+      } else {
+        responseText = "I'd be happy to help! You can book an appointment, ask about our services, " +
+                      "or learn about our head spa treatments. What would you like to know?";
+      }
+    }
+    
+    const twiml = `<?xml version="1.0" encoding="UTF-8"?>
+      <Response>
+        <Gather input="speech" timeout="3" speechTimeout="auto" 
+                action="/api/webhook/voice/process" method="POST">
+          <Say voice="alice">${responseText}</Say>
+        </Gather>
+        <Say voice="alice">Is there anything else I can help you with today?</Say>
+        <Pause length="2"/>
+        <Say voice="alice">Thank you for calling Glo Head Spa. Have a wonderful day!</Say>
+        <Hangup/>
+      </Response>`;
+    
     res.set('Content-Type', 'text/xml');
-    res.send('<Response><Say>Thank you.</Say></Response>');
+    res.send(twiml);
   });
 
   return server;

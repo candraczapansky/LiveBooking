@@ -4,11 +4,11 @@ import uvicorn
 import os
 from dotenv import load_dotenv
 
-from .sms_service import SMSService
-from .llm_service import LLMService
-from .database_service import DatabaseService
-from .voice_service import VoiceService
-from .models import SMSRequest, SMSResponse, VoiceRequest, VoiceResponse
+from sms_service import SMSService
+from llm_service import LLMService
+from database_service import DatabaseService
+from voice_service import VoiceService
+from models import SMSRequest, SMSResponse, VoiceRequest, VoiceResponse
 
 # Load environment variables
 load_dotenv()

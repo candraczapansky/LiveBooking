@@ -4,7 +4,7 @@ import psycopg2.extras
 import logging
 from typing import Optional, List, Dict, Any
 from datetime import datetime, timedelta
-from .models import ClientInfo, AppointmentInfo
+from models import ClientInfo, AppointmentInfo
 
 class DatabaseService:
     """Service for handling database operations"""

@@ -1,10 +1,10 @@
 {
   "business": {
-    "name": "Your Salon & Spa",
-    "address": "123 Main Street, Anytown, USA",
-    "phone": "(555) 123-4567",
-    "website": "www.yoursalon.com",
-    "email": "info@yoursalon.com",
+    "name": "Glo Head Spa",
+    "address": "Tulsa, Oklahoma",
+    "phone": "(918) 727-7348",
+    "website": "www.gloheadspa.com",
+    "email": "hello@headspaglo.com",
     "hours": {
       "monday": "9:00 AM - 7:00 PM",
       "tuesday": "9:00 AM - 7:00 PM",
@@ -14,204 +14,123 @@
       "saturday": "9:00 AM - 7:00 PM",
       "sunday": "10:00 AM - 5:00 PM"
     },
-    "description": "A full-service salon and spa offering hair, nail, and skin services."
+    "description": "A luxury head spa specializing in Japanese scalp treatments, relaxation, and hair wellness."
   },
   "services": {
-    "hair": [
+    "head_spa": [
       {
-        "name": "Women's Haircut",
-        "price": "$45-65",
+        "name": "Signature Head Spa",
+        "price": "$99",
         "duration": 60,
-        "description": "Includes consultation, shampoo, cut and style."
+        "description": "Our signature 60-minute Japanese scalp treatment including cleansing, massage, and hair treatment."
       },
       {
-        "name": "Men's Haircut",
-        "price": "$30-45",
-        "duration": 30,
-        "description": "Includes consultation, shampoo, cut and style."
+        "name": "Deluxe Head Spa",
+        "price": "$160",
+        "duration": 90,
+        "description": "Extended 90-minute session with enhanced scalp treatment, deeper massage, and premium hair mask."
       },
       {
-        "name": "Children's Haircut",
-        "price": "$25-35",
-        "duration": 30,
-        "description": "For children 12 and under."
-      },
-      {
-        "name": "Hair Color",
-        "price": "$85-150",
+        "name": "Platinum Head Spa",
+        "price": "$220",
         "duration": 120,
-        "description": "Full color service including root touch-up or full head."
-      },
-      {
-        "name": "Highlights",
-        "price": "$95-200",
-        "duration": 150,
-        "description": "Partial or full foil highlights."
-      },
-      {
-        "name": "Balayage",
-        "price": "$120-250",
-        "duration": 180,
-        "description": "Hand-painted highlights for a natural, sun-kissed look."
-      },
-      {
-        "name": "Blowout",
-        "price": "$35-55",
-        "duration": 45,
-        "description": "Shampoo, conditioning, and blowdry styling."
-      },
-      {
-        "name": "Updo",
-        "price": "$55-95",
-        "duration": 60,
-        "description": "Formal styling for special occasions."
+        "description": "Ultimate 2-hour luxury experience with full scalp therapy, extended massage, and exclusive treatments."
       }
     ],
-    "skin": [
+    "facials": [
       {
-        "name": "Express Facial",
-        "price": "$45",
-        "duration": 30,
-        "description": "Quick facial treatment for on-the-go clients."
-      },
-      {
-        "name": "Signature Facial",
-        "price": "$85",
+        "name": "Korean Glass Skin Facial",
+        "price": "$130",
         "duration": 60,
-        "description": "Customized facial treatment for all skin types."
+        "description": "Achieve radiant, glass-like skin with this Korean skincare treatment."
       },
       {
-        "name": "Deep Cleansing Facial",
-        "price": "$95",
-        "duration": 75,
-        "description": "Deep pore cleansing and extraction."
+        "name": "Buccal Massage Facial",
+        "price": "$190",
+        "duration": 90,
+        "description": "Intra-oral massage technique for facial contouring and lymphatic drainage."
       },
       {
-        "name": "Anti-Aging Facial",
-        "price": "$110",
-        "duration": 75,
-        "description": "Targets fine lines and wrinkles."
+        "name": "Face Lifting Massage Facial",
+        "price": "$150",
+        "duration": 60,
+        "description": "Natural face lifting through specialized massage techniques."
       }
     ],
-    "nails": [
+    "add_ons": [
       {
-        "name": "Manicure",
-        "price": "$30",
-        "duration": 30,
-        "description": "Nail shaping, cuticle care, hand massage, and polish."
+        "name": "High Frequency Comb",
+        "price": "$10",
+        "duration": 10,
+        "description": "Stimulates scalp circulation and promotes hair growth."
       },
       {
-        "name": "Pedicure",
-        "price": "$45",
-        "duration": 45,
-        "description": "Foot soak, exfoliation, nail and cuticle care, massage, and polish."
+        "name": "Oxygen Scalp Therapy",
+        "price": "$15",
+        "duration": 10,
+        "description": "Oxygen infusion for scalp rejuvenation."
       },
       {
-        "name": "Gel Manicure",
-        "price": "$45",
-        "duration": 45,
-        "description": "Gel polish application that lasts up to 2 weeks."
+        "name": "Lymphatic Neck Massage",
+        "price": "$10",
+        "duration": 10,
+        "description": "Lymphatic drainage for neck and shoulders."
       },
       {
-        "name": "Gel Pedicure",
-        "price": "$60",
-        "duration": 60,
-        "description": "Pedicure with gel polish application."
-      }
-    ],
-    "massage": [
-      {
-        "name": "Swedish Massage",
-        "price": "$80",
-        "duration": 60,
-        "description": "Relaxation massage with light to medium pressure."
-      },
-      {
-        "name": "Deep Tissue Massage",
-        "price": "$90",
-        "duration": 60,
-        "description": "Targets deeper muscle layers with firm pressure."
-      },
-      {
-        "name": "Hot Stone Massage",
-        "price": "$100",
-        "duration": 75,
-        "description": "Heated stones used to enhance relaxation and relieve tension."
-      },
-      {
-        "name": "Prenatal Massage",
-        "price": "$85",
-        "duration": 60,
-        "description": "Safe, comfortable massage for expectant mothers."
+        "name": "Facial Gua Sha Sculpting",
+        "price": "$15",
+        "duration": 10,
+        "description": "Traditional Chinese facial sculpting technique."
       }
     ]
   },
   "faqs": [
     {
+      "question": "What is a head spa treatment?",
+      "answer": "A head spa is a Japanese-inspired scalp treatment that combines deep cleansing, massage, and hair treatment for ultimate relaxation and hair health."
+    },
+    {
       "question": "How do I book an appointment?",
-      "answer": "You can book an appointment by calling us directly, through our website, or by texting this number with your preferred service, date, and time."
+      "answer": "You can book by texting us, calling (918) 727-7348, or through our online booking system."
     },
     {
       "question": "What is your cancellation policy?",
-      "answer": "We require 24 hours notice for cancellations. Late cancellations or no-shows may result in a charge of 50% of the service price."
+      "answer": "We require 24 hours notice for cancellations to avoid a cancellation fee."
     },
     {
-      "question": "Do you take walk-ins?",
-      "answer": "We accept walk-ins based on availability. For guaranteed service, we recommend booking in advance."
+      "question": "Do you accept walk-ins?",
+      "answer": "We recommend booking in advance, but we'll accommodate walk-ins based on availability."
     },
     {
-      "question": "What forms of payment do you accept?",
-      "answer": "We accept all major credit cards, debit cards, cash, and digital payment methods like Apple Pay and Google Pay."
+      "question": "What should I expect during my first visit?",
+      "answer": "Your first visit includes a consultation, scalp analysis, and your chosen treatment. Please arrive 10 minutes early."
     },
     {
-      "question": "Do you sell gift certificates?",
-      "answer": "Yes, we offer gift certificates in any denomination, which can be purchased in-store or through our website."
+      "question": "How often should I get a head spa treatment?",
+      "answer": "We recommend every 2-4 weeks for optimal scalp health and relaxation benefits."
+    },
+    {
+      "question": "Can I add services to my appointment?",
+      "answer": "Yes! We offer various add-ons that can enhance your treatment experience."
     }
   ],
   "promotions": [
     {
       "title": "New Client Special",
-      "description": "15% off your first service with us.",
-      "expiration_date": "2023-12-31",
-      "code": "NEWCLIENT15"
+      "description": "15% off your first head spa treatment",
+      "code": "NEWGLO15",
+      "active": true
     },
     {
-      "title": "Refer a Friend",
-      "description": "Refer a friend and you both receive $15 off your next service.",
-      "expiration_date": "2023-12-31",
-      "code": "REFERRAL15"
+      "title": "Membership Benefits",
+      "description": "Join our membership program for exclusive discounts and priority booking",
+      "active": true
     }
   ],
-  "staff": [
-    {
-      "name": "Sarah Johnson",
-      "title": "Master Stylist",
-      "specialties": [
-        "Hair Color",
-        "Balayage",
-        "Haircuts"
-      ],
-      "bio": "Sarah has over 10 years of experience specializing in dimensional color and precision cutting."
-    },
-    {
-      "name": "Michael Chen",
-      "title": "Esthetician",
-      "specialties": [
-        "Facials",
-        "Waxing",
-        "Skin Care"
-      ],
-      "bio": "Michael is a licensed esthetician with expertise in treating various skin concerns."
-    },
-    {
-      "name": "Emma Rodriguez",
-      "title": "Nail Technician",
-      "specialties": [
-        "Gel Nails",
-        "Nail Art",
-        "Pedicures"
-      ],
-      "bio": "Emma creates beautiful, long-lasting nail designs and provides excellent nail care."
-    }
-  ]
+  "booking_rules": {
+    "advance_booking_days": 30,
+    "min_advance_hours": 2,
+    "buffer_between_appointments": 15,
+    "max_daily_appointments_per_client": 1
+  }
 }

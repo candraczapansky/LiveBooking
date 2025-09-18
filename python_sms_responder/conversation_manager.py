@@ -2,7 +2,7 @@ import json
 import logging
 from typing import Dict, Any, Optional
 from datetime import datetime, timedelta
-from .models import ClientInfo, AppointmentInfo
+from models import ClientInfo, AppointmentInfo
 
 class ConversationState:
     """Represents the state of a conversation"""
