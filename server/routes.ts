@@ -2305,7 +2305,7 @@ export async function registerRoutes(app: Express, storage: IStorage, autoRenewa
           <Say voice="alice">
             Hello! Thank you for calling Glo Head Spa. I'm your AI assistant and I'm here to help you today.
           </Say>
-          <Gather input="speech" timeout="3" speechTimeout="auto" 
+          <Gather input="speech" timeout="3" speechTimeout="1" 
                   action="https://dev-booking-91625-candraczapansky.replit.app/api/webhook/voice/process" 
                   method="POST">
             <Say voice="alice">
@@ -2360,7 +2360,7 @@ export async function registerRoutes(app: Express, storage: IStorage, autoRenewa
     
     const twiml = `<?xml version="1.0" encoding="UTF-8"?>
       <Response>
-        <Gather input="speech" timeout="3" speechTimeout="auto" 
+        <Gather input="speech" timeout="3" speechTimeout="1" 
                 action="/api/webhook/voice/process" method="POST">
           <Say voice="alice">${responseText}</Say>
         </Gather>
